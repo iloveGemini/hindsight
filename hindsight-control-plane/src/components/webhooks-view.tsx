@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { formatDateTime } from "@/lib/timezone";
 import { useBank } from "@/lib/bank-context";
 import { client, Webhook, WebhookDelivery, WebhookHttpConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -467,7 +468,7 @@ export function WebhooksView() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return t("formatDateNA");
-    return new Date(dateStr).toLocaleString();
+    return formatDateTime(dateStr);
   };
 
   if (!currentBank) return null;

@@ -107,6 +107,8 @@ api:
   env:
     #HINDSIGHT_API_LLM_PROVIDER: "groq"
     HINDSIGHT_API_LLM_MODEL: "openai/gpt-oss-120b"
+    # IANA timezone used for naive input dates, LLM prompts, and UI display.
+    HINDSIGHT_API_TIMEZONE: "UTC"
 
   # Secret environment variables
   secrets:
@@ -267,6 +269,8 @@ controlPlane:
     NODE_ENV: "production"
     HINDSIGHT_CP_HOSTNAME: "0.0.0.0"
     HINDSIGHT_CP_PORT: "3000"
+    # IANA time zone used by the API and Control Plane for user-facing dates.
+    HINDSIGHT_API_TIMEZONE: "UTC"
 
 # PostgreSQL configuration
 postgresql:

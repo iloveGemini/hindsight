@@ -45,6 +45,18 @@ const THEME_INIT_SCRIPT = `
 })();
 `;
 
+function getTimeZone(): string {
+  const configured = process.env.HINDSIGHT_API_TIMEZONE?.trim();
+  if (!configured) return "UTC";
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: configured }).format();
+    return configured;
+  } catch {
+    return "UTC";
+  }
+}
+
 export default async function LocaleLayout({
   children,
   params,
@@ -62,6 +74,7 @@ export default async function LocaleLayout({
   return (
     <html
       lang={locale}
+      data-timezone={getTimeZone()}
       className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >

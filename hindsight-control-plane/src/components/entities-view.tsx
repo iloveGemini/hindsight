@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { formatDate as formatDisplayDate } from "@/lib/timezone";
 import { client } from "@/lib/api";
 import { useBank } from "@/lib/bank-context";
 import { Button } from "@/components/ui/button";
@@ -238,7 +239,7 @@ export function EntitiesView() {
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return t("na");
-    return new Date(dateStr).toLocaleDateString();
+    return formatDisplayDate(dateStr);
   };
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { formatDate, formatDateTime } from "@/lib/timezone";
 import { toast } from "sonner";
 import { client, LLMRequestEntry } from "@/lib/api";
 import { useBank } from "@/lib/bank-context";
@@ -376,7 +377,7 @@ function DocumentRetainTraces({ bankId, documentId }: { bankId: string; document
               />
               <span className="font-mono text-xs">{run.entry.operation || "retain"}</span>
               <span className="text-muted-foreground text-xs truncate">
-                {run.start ? new Date(run.start).toLocaleString() : ""}
+                {run.start ? formatDateTime(run.start) : ""}
               </span>
             </span>
             <span className="text-muted-foreground text-xs font-mono shrink-0">
@@ -599,9 +600,9 @@ function InvalidatedFactsSection({ bankId, documentId }: { bankId: string; docum
               )}
               {row.occurred_start && (
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(row.occurred_start).toLocaleDateString()}
+                  {formatDate(row.occurred_start)}
                   {row.occurred_end && row.occurred_end !== row.occurred_start && (
-                    <> → {new Date(row.occurred_end).toLocaleDateString()}</>
+                    <> → {formatDate(row.occurred_end)}</>
                   )}
                 </div>
               )}
@@ -613,7 +614,7 @@ function InvalidatedFactsSection({ bankId, documentId }: { bankId: string; docum
                     </>
                   )}
                   {row.invalidation_reason && row.invalidated_at && " · "}
-                  {row.invalidated_at && new Date(row.invalidated_at).toLocaleString()}
+                  {row.invalidated_at && formatDateTime(row.invalidated_at)}
                 </div>
               )}
             </div>
@@ -1564,7 +1565,7 @@ export function DocumentsView() {
                           </div>
                           <div className="mt-0.5 text-xs text-muted-foreground truncate">
                             {upload.filename ? `${upload.filename} · ` : ""}
-                            <span title={new Date(upload.createdAt).toLocaleString()}>
+                            <span title={formatDateTime(upload.createdAt)}>
                               {formatRelativeTime(upload.createdAt)}
                             </span>
                           </div>
@@ -1637,7 +1638,7 @@ export function DocumentsView() {
                                   already ragged, and nothing moves. */}
                               <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                                 {doc.updated_at ? (
-                                  <span title={new Date(doc.updated_at).toLocaleString()}>
+                                  <span title={formatDateTime(doc.updated_at)}>
                                     {t("colUpdated")} {formatRelativeTime(doc.updated_at)}
                                   </span>
                                 ) : (
@@ -1892,13 +1893,13 @@ export function DocumentsView() {
                         {selectedDocument.created_at && (
                           <MetadataRow
                             label={t("labelCreated")}
-                            value={new Date(selectedDocument.created_at).toLocaleString()}
+                            value={formatDateTime(selectedDocument.created_at)}
                           />
                         )}
                         {selectedDocument.updated_at && (
                           <MetadataRow
                             label={t("labelUpdated")}
-                            value={new Date(selectedDocument.updated_at).toLocaleString()}
+                            value={formatDateTime(selectedDocument.updated_at)}
                           />
                         )}
                         {selectedDocument.original_text && (

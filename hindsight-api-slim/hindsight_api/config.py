@@ -540,6 +540,7 @@ ENV_TEXT_SEARCH_EXTENSION_NATIVE_LANGUAGE = "HINDSIGHT_API_TEXT_SEARCH_EXTENSION
 ENV_TEXT_SEARCH_EXTENSION_PG_SEARCH_TOKENIZER = "HINDSIGHT_API_TEXT_SEARCH_EXTENSION_PG_SEARCH_TOKENIZER"
 ENV_LLM_OUTPUT_LANGUAGE = "HINDSIGHT_API_LLM_OUTPUT_LANGUAGE"
 ENV_QUERY_ANALYZER_LANGUAGES = "HINDSIGHT_API_QUERY_ANALYZER_LANGUAGES"
+ENV_TIMEZONE = "HINDSIGHT_API_TIMEZONE"
 
 ENV_HOST = "HINDSIGHT_API_HOST"
 ENV_PORT = "HINDSIGHT_API_PORT"
@@ -1176,6 +1177,7 @@ DEFAULT_TEXT_SEARCH_EXTENSION = "native"  # Options: "native", "vchord", "pg_tex
 # pgroonga: TokenBigram polyglot, pg_search: per-field Tantivy tokenizer).
 DEFAULT_TEXT_SEARCH_EXTENSION_NATIVE_LANGUAGE = "english"
 DEFAULT_TEXT_SEARCH_EXTENSION_PG_SEARCH_TOKENIZER = ""
+DEFAULT_TIMEZONE = "UTC"
 
 # LiteLLM defaults
 DEFAULT_LITELLM_API_BASE = "http://localhost:4000"
@@ -2252,6 +2254,7 @@ class HindsightConfig:
     # observations, reflect responses) is forced into this language regardless
     # of the source content. Unset preserves source language.
     llm_output_language: str | None
+    timezone: str
 
     # LLM (default, used as fallback for per-operation config)
     llm_provider: str
@@ -3098,6 +3101,10 @@ class HindsightConfig:
                 f"'french', 'simple', 'zhparser'."
             )
 
+        from hindsight_api.timezone import get_timezone
+
+        get_timezone(self.timezone)
+
         self.text_search_extension_pg_search_tokenizer = normalize_pg_search_tokenizer(
             self.text_search_extension_pg_search_tokenizer
         )
@@ -3250,6 +3257,7 @@ class HindsightConfig:
                 else None
             ),
             llm_output_language=(os.getenv(ENV_LLM_OUTPUT_LANGUAGE) or None),
+            timezone=os.getenv(ENV_TIMEZONE, DEFAULT_TIMEZONE).strip() or DEFAULT_TIMEZONE,
             # LLM
             llm_provider=llm_provider,
             llm_api_key=os.getenv(ENV_LLM_API_KEY),

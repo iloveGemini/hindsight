@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { formatDate } from "@/lib/timezone";
 import { client } from "@/lib/api";
 import { resolveTemporalWindow } from "@/lib/temporal-window";
 import { useBank } from "@/lib/bank-context";
@@ -471,9 +472,7 @@ export function SearchDebugView() {
                                   <span className="truncate max-w-xs">{result.context}</span>
                                 )}
                                 {result.occurred_start && (
-                                  <span>
-                                    {new Date(result.occurred_start).toLocaleDateString()}
-                                  </span>
+                                  <span>{formatDate(result.occurred_start)}</span>
                                 )}
                               </div>
                               {result.scores && (
@@ -672,15 +671,15 @@ export function SearchDebugView() {
                                                       <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                                         <Calendar className="h-3 w-3" />
                                                         {method.metadata.constraint.start
-                                                          ? new Date(
+                                                          ? formatDate(
                                                               method.metadata.constraint.start
-                                                            ).toLocaleDateString()
+                                                            )
                                                           : "any"}
                                                         {" → "}
                                                         {method.metadata.constraint.end
-                                                          ? new Date(
+                                                          ? formatDate(
                                                               method.metadata.constraint.end
-                                                            ).toLocaleDateString()
+                                                            )
                                                           : "any"}
                                                       </span>
                                                     )}

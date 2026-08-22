@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { formatDateTime as formatConfiguredDateTime } from "@/lib/timezone";
 import { client } from "@/lib/api";
 import { useBank } from "@/lib/bank-context";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -28,16 +29,16 @@ interface DirectiveDetailModalProps {
 }
 
 const formatDateTime = (dateStr: string) => {
-  const date = new Date(dateStr);
-  return `${date.toLocaleDateString("en-US", {
+  return formatConfiguredDateTime(dateStr, {
+    dateStyle: undefined,
+    timeStyle: undefined,
+    year: "numeric",
     month: "short",
     day: "numeric",
-    year: "numeric",
-  })} at ${date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  })}`;
+  });
 };
 
 export function DirectiveDetailModal({ directiveId, onClose }: DirectiveDetailModalProps) {

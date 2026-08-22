@@ -581,7 +581,7 @@ function MentalModelHistoryView({
             v{history.length - idx + 1}
             {idx === 0 ? t("versionCurrent") : ""}
           </span>{" "}
-          &middot; {t("changedAt", { date: new Date(entry.changed_at).toLocaleString() })}
+          &middot; {t("changedAt", { date: formatDateTime(entry.changed_at) })}
           {afterTrace && (
             <>
               {" "}

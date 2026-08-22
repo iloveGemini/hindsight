@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { formatDateTime as formatConfiguredDateTime, formatDate, formatTime } from "@/lib/timezone";
 import { useBank } from "@/lib/bank-context";
 import { client, AuditLogEntry, AuditStatsBucket } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -81,8 +82,7 @@ function formatDuration(startedAt: string | null, endedAt: string | null): strin
 
 function formatDateTime(ts: string | null): string {
   if (!ts) return "—";
-  const date = new Date(ts);
-  return date.toLocaleString(undefined, {
+  return formatConfiguredDateTime(ts, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -93,11 +93,10 @@ function formatDateTime(ts: string | null): string {
 }
 
 function formatChartLabel(ts: string, trunc: string): string {
-  const date = new Date(ts);
   if (trunc === "hour") {
-    return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return formatTime(ts, { hour: "2-digit", minute: "2-digit" });
   }
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatDate(ts, { month: "short", day: "numeric" });
 }
 
 function TransportBadge({ transport }: { transport: string }) {

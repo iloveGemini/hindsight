@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import cronstrue from "cronstrue";
 import { CronExpressionParser } from "cron-parser";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { formatDateTime } from "@/lib/timezone";
 
 /**
  * Live preview for a cron expression: a human-readable description plus the next
@@ -40,7 +41,7 @@ export function CronSchedulePreview({ cron }: { cron: string }) {
       hour12: false,
     });
   const fmtLocal = (d: Date) =>
-    d.toLocaleString(undefined, {
+    formatDateTime(d, {
       day: "2-digit",
       month: "short",
       hour: "2-digit",

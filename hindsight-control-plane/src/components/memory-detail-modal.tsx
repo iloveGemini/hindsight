@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { formatDateTime } from "@/lib/timezone";
 import { client } from "@/lib/api";
 import { useBank } from "@/lib/bank-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -312,12 +313,12 @@ export function MemoryDetailModal({
                         <div className="flex items-center gap-2 text-sm text-foreground">
                           <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           <span>
-                            {new Date(memory.occurred_start).toLocaleString()}
+                            {formatDateTime(memory.occurred_start)}
                             {memory.occurred_end &&
                               memory.occurred_end !== memory.occurred_start && (
                                 <>
                                   <span className="text-muted-foreground mx-1">→</span>
-                                  {new Date(memory.occurred_end).toLocaleString()}
+                                  {formatDateTime(memory.occurred_end)}
                                 </>
                               )}
                           </span>
@@ -332,7 +333,7 @@ export function MemoryDetailModal({
                         </div>
                         <div className="flex items-center gap-2 text-sm text-foreground">
                           <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <span>{new Date(memory.mentioned_at).toLocaleString()}</span>
+                          <span>{formatDateTime(memory.mentioned_at)}</span>
                         </div>
                       </div>
                     )}
@@ -420,7 +421,7 @@ export function MemoryDetailModal({
                                       {t("sourceOccurred")}
                                     </div>
                                     <div className="font-medium">
-                                      {new Date(source.occurred_start).toLocaleString()}
+                                      {formatDateTime(source.occurred_start)}
                                     </div>
                                   </div>
                                 )}
@@ -430,7 +431,7 @@ export function MemoryDetailModal({
                                       {t("sourceMentioned")}
                                     </div>
                                     <div className="font-medium">
-                                      {new Date(source.mentioned_at).toLocaleString()}
+                                      {formatDateTime(source.mentioned_at)}
                                     </div>
                                   </div>
                                 )}
@@ -525,7 +526,7 @@ export function MemoryDetailModal({
                               {memory.edited_at && (
                                 <span
                                   className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium"
-                                  title={new Date(memory.edited_at).toLocaleString()}
+                                  title={formatDateTime(memory.edited_at)}
                                 >
                                   {tCuration("editedBadge")}
                                 </span>
@@ -589,8 +590,7 @@ export function MemoryDetailModal({
                                     </>
                                   )}
                                   {memory.invalidation_reason && memory.invalidated_at && " · "}
-                                  {memory.invalidated_at &&
-                                    new Date(memory.invalidated_at).toLocaleString()}
+                                  {memory.invalidated_at && formatDateTime(memory.invalidated_at)}
                                 </div>
                               )}
                           </div>
@@ -615,12 +615,12 @@ export function MemoryDetailModal({
                             <div className="flex items-center gap-2 text-sm text-foreground">
                               <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span>
-                                {new Date(memory.occurred_start).toLocaleString()}
+                                {formatDateTime(memory.occurred_start)}
                                 {memory.occurred_end &&
                                   memory.occurred_end !== memory.occurred_start && (
                                     <>
                                       <span className="text-muted-foreground mx-1">→</span>
-                                      {new Date(memory.occurred_end).toLocaleString()}
+                                      {formatDateTime(memory.occurred_end)}
                                     </>
                                   )}
                               </span>
@@ -635,7 +635,7 @@ export function MemoryDetailModal({
                             </div>
                             <div className="flex items-center gap-2 text-sm text-foreground">
                               <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>{new Date(memory.mentioned_at).toLocaleString()}</span>
+                              <span>{formatDateTime(memory.mentioned_at)}</span>
                             </div>
                           </div>
                         )}
@@ -761,7 +761,7 @@ export function MemoryDetailModal({
                                 {t("sectionCreated")}
                               </div>
                               <div className="text-sm text-foreground">
-                                {new Date(document.created_at).toLocaleString()}
+                                {formatDateTime(document.created_at)}
                               </div>
                             </div>
                           )}

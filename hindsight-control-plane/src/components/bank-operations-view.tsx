@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useBank } from "@/lib/bank-context";
+import { formatDateTime, formatTime } from "@/lib/timezone";
 import { client, type OperationProgress } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -204,12 +205,12 @@ export function BankOperationsView() {
         return (
           <span
             className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-            title={t("deferredUntilTitle", { time: deferredUntil.toLocaleString() })}
+            title={t("deferredUntilTitle", { time: formatDateTime(deferredUntil) })}
           >
             <Clock className="w-3 h-3" />
             {t("status.deferred")}
             <span className="opacity-70">
-              {deferredUntil.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {formatTime(deferredUntil, { hour: "2-digit", minute: "2-digit" })}
             </span>
           </span>
         );
@@ -307,7 +308,7 @@ export function BankOperationsView() {
       return (
         <div
           className="flex items-center gap-1.5 text-[11px] text-muted-foreground whitespace-nowrap"
-          title={`${stageLabel}${progress.at ? ` — ${new Date(progress.at).toLocaleString()}` : ""}`}
+          title={`${stageLabel}${progress.at ? ` — ${formatDateTime(progress.at)}` : ""}`}
         >
           {pct !== null && (
             <span className="h-1 w-14 shrink-0 rounded-full bg-muted overflow-hidden">
@@ -345,7 +346,7 @@ export function BankOperationsView() {
         {progress.at && (
           <div
             className="flex items-center gap-1 text-[10px] text-muted-foreground/80"
-            title={new Date(progress.at).toLocaleString()}
+            title={formatDateTime(progress.at)}
           >
             <Clock className="w-2.5 h-2.5" />
             <span>
@@ -641,11 +642,11 @@ export function BankOperationsView() {
                         {formatOperationType(op.task_type)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {new Date(op.created_at).toLocaleString()}
+                        {formatDateTime(op.created_at)}
                       </TableCell>
                       <TableCell
                         className="text-sm text-muted-foreground"
-                        title={op.updated_at ? new Date(op.updated_at).toLocaleString() : undefined}
+                        title={op.updated_at ? formatDateTime(op.updated_at) : undefined}
                       >
                         {op.updated_at ? formatHeartbeat(op.updated_at) : "—"}
                       </TableCell>
@@ -814,7 +815,7 @@ export function BankOperationsView() {
                       </div>
                       <div className="mt-1 text-sm">
                         {selectedOperation.created_at
-                          ? new Date(selectedOperation.created_at).toLocaleString()
+                          ? formatDateTime(selectedOperation.created_at)
                           : t("notAvailable")}
                       </div>
                     </div>
@@ -824,7 +825,7 @@ export function BankOperationsView() {
                       </div>
                       <div className="mt-1 text-sm">
                         {selectedOperation.updated_at
-                          ? new Date(selectedOperation.updated_at).toLocaleString()
+                          ? formatDateTime(selectedOperation.updated_at)
                           : t("notAvailable")}
                       </div>
                     </div>
@@ -834,7 +835,7 @@ export function BankOperationsView() {
                           {t("field.completed")}
                         </div>
                         <div className="mt-1 text-sm">
-                          {new Date(selectedOperation.completed_at).toLocaleString()}
+                          {formatDateTime(selectedOperation.completed_at)}
                         </div>
                       </div>
                     )}

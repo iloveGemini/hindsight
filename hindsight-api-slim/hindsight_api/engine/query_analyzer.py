@@ -343,7 +343,9 @@ class DateparserQueryAnalyzer(QueryAnalyzer):
             QueryAnalysis with temporal_constraint if found
         """
         if reference_date is None:
-            reference_date = datetime.now()
+            from hindsight_api.timezone import now
+
+            reference_date = now()
 
         # Check for period expressions first (these need special handling)
         query_lower = query.lower()
@@ -369,7 +371,11 @@ class DateparserQueryAnalyzer(QueryAnalyzer):
         settings = {
             "RELATIVE_BASE": reference_date,
             "PREFER_DATES_FROM": "past",
-            "RETURN_AS_TIMEZONE_AWARE": False,
+            # Keep the legacy naive result for callers that provide a naive
+            # reference date; API requests without one use the configured zone.
+            "RETURN_AS_TIMEZONE_AWARE": reference_date.tzinfo is not None,
+            "TIMEZONE": getattr(reference_date.tzinfo, "key", "UTC"),
+            "TO_TIMEZONE": "UTC",
         }
 
         # Wrap dateparser in a defensive try/except. dateparser has been

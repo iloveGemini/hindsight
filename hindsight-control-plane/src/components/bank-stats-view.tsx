@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { formatDate, formatDateTime, formatTime } from "@/lib/timezone";
 import { useBank } from "@/lib/bank-context";
 import { useFeatures } from "@/lib/features-context";
 import { client, MentalModel } from "@/lib/api";
@@ -235,19 +236,17 @@ function parseBucketIso(iso: string): Date {
 }
 
 function formatBucketLabel(iso: string, trunc: string): string {
-  const d = parseBucketIso(iso);
   if (trunc === "day") {
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return formatDate(parseBucketIso(iso), { month: "short", day: "numeric" });
   }
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return formatTime(parseBucketIso(iso), { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatBucketTooltip(iso: string, trunc: string): string {
-  const d = parseBucketIso(iso);
   if (trunc === "day") {
-    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    return formatDate(parseBucketIso(iso), { weekday: "short", month: "short", day: "numeric" });
   }
-  return d.toLocaleString(undefined, {
+  return formatDateTime(parseBucketIso(iso), {
     month: "short",
     day: "numeric",
     hour: "2-digit",

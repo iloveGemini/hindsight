@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { formatDateTime } from "@/lib/timezone";
 import { TagChip } from "@/components/ui/facet-chip";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -147,15 +148,15 @@ function DateDiff({
       {changed ? (
         <>
           <span className="text-xs bg-red-500/15 text-red-700 dark:text-red-400 line-through rounded-sm px-0.5">
-            {before ? new Date(before).toLocaleString() : "—"}
+            {before ? formatDateTime(before) : "—"}
           </span>
           {" → "}
           <span className="text-xs bg-green-500/15 text-green-700 dark:text-green-400 rounded-sm px-0.5">
-            {after ? new Date(after).toLocaleString() : "—"}
+            {after ? formatDateTime(after) : "—"}
           </span>
         </>
       ) : (
-        <span className="text-xs">{after ? new Date(after).toLocaleString() : "—"}</span>
+        <span className="text-xs">{after ? formatDateTime(after) : "—"}</span>
       )}
     </div>
   );
@@ -228,7 +229,7 @@ export function ObservationHistoryView({
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
           {t("changeOf", { current: history.length - idx, total: history.length })} &middot;{" "}
-          {new Date(entry.changed_at).toLocaleString()}
+          {formatDateTime(entry.changed_at)}
         </span>
         <div className="flex items-center gap-1">
           <Button

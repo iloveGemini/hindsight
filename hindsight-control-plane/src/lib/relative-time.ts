@@ -25,16 +25,16 @@ export function formatRelativeTime(dateStr: string): string {
 }
 
 export function formatAbsoluteDateTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return `${date.toLocaleDateString("en-US", {
+  return formatDateTime(dateStr, {
+    dateStyle: undefined,
+    timeStyle: undefined,
+    year: "numeric",
     month: "short",
     day: "numeric",
-    year: "numeric",
-  })} at ${date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  })}`;
+  });
 }
 
 /**
@@ -55,17 +55,37 @@ export function formatAbsoluteDateTime(dateStr: string): string {
 export function formatWatermark(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
-  const time = date.toLocaleTimeString(undefined, {
+  const time = formatTime(dateStr, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
-  if (date.toDateString() === now.toDateString()) return time;
-  const dayMonth = date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-  if (date.getFullYear() === now.getFullYear()) return `${dayMonth} ${time}`;
-  return date.toLocaleDateString(undefined, {
+  const dateParts = new Intl.DateTimeFormat(undefined, {
+    timeZone: getConfiguredTimeZone(),
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(date);
+  const nowParts = new Intl.DateTimeFormat(undefined, {
+    timeZone: getConfiguredTimeZone(),
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(now);
+  const get = (parts: Intl.DateTimeFormatPart[], type: string) =>
+    parts.find((part) => part.type === type)?.value;
+  if (
+    get(dateParts, "year") === get(nowParts, "year") &&
+    get(dateParts, "month") === get(nowParts, "month") &&
+    get(dateParts, "day") === get(nowParts, "day")
+  )
+    return time;
+  const dayMonth = formatDate(dateStr, { day: "numeric", month: "short" });
+  if (get(dateParts, "year") === get(nowParts, "year")) return `${dayMonth} ${time}`;
+  return formatDate(dateStr, {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
+import { formatDate, formatDateTime, formatTime, getConfiguredTimeZone } from "@/lib/timezone";

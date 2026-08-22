@@ -8,7 +8,6 @@ The reflect agent uses hierarchical retrieval:
 """
 
 import json
-from datetime import datetime, timezone
 from typing import Any
 
 from .tokenization import count_cl100k_tokens
@@ -22,13 +21,16 @@ _DEFAULT_FINAL_ROLE = "You are a thoughtful assistant that synthesizes answers f
 
 
 def _current_utc_datetime() -> str:
-    """Return the current UTC date and time for time-relative reflect reasoning.
+    """Return the configured local date and time for time-relative reasoning.
 
     Minute precision (not seconds) so requests within the same minute share an
     identical prompt string — the finest granularity that still keeps prompt
     caching viable for bursty traffic.
     """
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    from hindsight_api.timezone import now
+
+    current = now()
+    return current.strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _current_datetime_section() -> str:

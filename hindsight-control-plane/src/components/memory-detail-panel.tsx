@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { formatDateTime } from "@/lib/timezone";
 import { Button } from "@/components/ui/button";
 import { TagList } from "@/components/ui/tag-list";
 import { Copy, Check, X, Calendar, History, Activity, RotateCcw, Pencil } from "lucide-react";
@@ -116,7 +117,7 @@ function MemoryTraceRef({ bankId, memoryId }: { bankId: string; memoryId: string
         />
         <span className="font-mono text-xs">{run.entry.operation || "—"}</span>
         <span className="text-muted-foreground text-xs truncate">
-          {run.start ? new Date(run.start).toLocaleString() : ""}
+          {run.start ? formatDateTime(run.start) : ""}
         </span>
       </span>
       <span className="text-muted-foreground text-xs font-mono shrink-0">
@@ -339,7 +340,7 @@ export function MemoryDetailPanel({
                     {displayMemory.edited_at && (
                       <span
                         className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium"
-                        title={new Date(displayMemory.edited_at).toLocaleString()}
+                        title={formatDateTime(displayMemory.edited_at)}
                       >
                         {t("editedBadge")}
                       </span>
@@ -405,7 +406,7 @@ export function MemoryDetailPanel({
                         )}
                         {displayMemory.invalidation_reason && displayMemory.invalidated_at && " · "}
                         {displayMemory.invalidated_at &&
-                          new Date(displayMemory.invalidated_at).toLocaleString()}
+                          formatDateTime(displayMemory.invalidated_at)}
                       </div>
                     )}
                 </div>
@@ -430,12 +431,12 @@ export function MemoryDetailPanel({
                   <div className="flex items-center gap-2 text-sm text-foreground">
                     <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span>
-                      {new Date(displayMemory.occurred_start).toLocaleString()}
+                      {formatDateTime(displayMemory.occurred_start)}
                       {displayMemory.occurred_end &&
                         displayMemory.occurred_end !== displayMemory.occurred_start && (
                           <>
                             <span className="text-muted-foreground mx-1">→</span>
-                            {new Date(displayMemory.occurred_end).toLocaleString()}
+                            {formatDateTime(displayMemory.occurred_end)}
                           </>
                         )}
                     </span>
@@ -450,7 +451,7 @@ export function MemoryDetailPanel({
                   </div>
                   <div className="flex items-center gap-2 text-sm text-foreground">
                     <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <span>{new Date(displayMemory.mentioned_at).toLocaleString()}</span>
+                    <span>{formatDateTime(displayMemory.mentioned_at)}</span>
                   </div>
                 </div>
               )}
@@ -526,7 +527,7 @@ export function MemoryDetailPanel({
                             </div>
                             <div className="font-medium">
                               {source.occurred_start
-                                ? new Date(source.occurred_start).toLocaleString()
+                                ? formatDateTime(source.occurred_start)
                                 : t("notAvailable")}
                             </div>
                           </div>
@@ -536,7 +537,7 @@ export function MemoryDetailPanel({
                             </div>
                             <div className="font-medium">
                               {source.mentioned_at
-                                ? new Date(source.mentioned_at).toLocaleString()
+                                ? formatDateTime(source.mentioned_at)
                                 : t("notAvailable")}
                             </div>
                           </div>
@@ -703,12 +704,12 @@ export function MemoryDetailPanel({
                     className={`${compact ? "h-3 w-3" : "h-4 w-4"} text-muted-foreground flex-shrink-0`}
                   />
                   <span>
-                    {new Date(displayMemory.occurred_start).toLocaleString()}
+                    {formatDateTime(displayMemory.occurred_start)}
                     {displayMemory.occurred_end &&
                       displayMemory.occurred_end !== displayMemory.occurred_start && (
                         <>
                           <span className="text-muted-foreground mx-1">→</span>
-                          {new Date(displayMemory.occurred_end).toLocaleString()}
+                          {formatDateTime(displayMemory.occurred_end)}
                         </>
                       )}
                   </span>
@@ -725,7 +726,7 @@ export function MemoryDetailPanel({
                   <Calendar
                     className={`${compact ? "h-3 w-3" : "h-4 w-4"} text-muted-foreground flex-shrink-0`}
                   />
-                  <span>{new Date(displayMemory.mentioned_at).toLocaleString()}</span>
+                  <span>{formatDateTime(displayMemory.mentioned_at)}</span>
                 </div>
               </div>
             )}

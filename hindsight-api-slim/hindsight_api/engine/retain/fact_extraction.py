@@ -1227,7 +1227,9 @@ def _build_user_message(
 
     if event_date is not None:
         event_date = parse_datetime_flexible(event_date)
-        event_date_str = f"{event_date.strftime('%A, %B %d, %Y')} ({event_date.isoformat()})"
+        from hindsight_api.timezone import format_for_prompt
+
+        event_date_str = format_for_prompt(event_date)
     else:
         event_date_str = "Unknown"
 
@@ -2763,7 +2765,10 @@ def _parse_datetime(date_str: str):
     from dateutil import parser as date_parser
 
     try:
-        return date_parser.isoparse(date_str)
+        parsed = date_parser.isoparse(date_str)
+        from hindsight_api.timezone import to_utc
+
+        return to_utc(parsed)
     except Exception:
         return None
 

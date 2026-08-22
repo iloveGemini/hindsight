@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { formatDateTime } from "@/lib/timezone";
 import { client } from "@/lib/api";
 import { useBank } from "@/lib/bank-context";
 import {
@@ -100,7 +101,7 @@ export function DocumentChunkModal({ type, id, onClose }: DocumentChunkModalProp
                             {t("sectionCreated")}
                           </div>
                           <div className="text-sm text-foreground">
-                            {new Date(data.created_at).toLocaleString()}
+                            {formatDateTime(data.created_at)}
                           </div>
                         </div>
                         <div className="p-3 bg-muted rounded-lg">
@@ -169,7 +170,7 @@ export function DocumentChunkModal({ type, id, onClose }: DocumentChunkModalProp
                           {t("sectionCreated")}
                         </div>
                         <div className="text-sm text-foreground">
-                          {new Date(data.created_at).toLocaleString()}
+                          {formatDateTime(data.created_at)}
                         </div>
                       </div>
                     )}

@@ -256,17 +256,15 @@ def parse_datetime_flexible(value: Any) -> datetime:
         ValueError: If string is not a valid ISO datetime
     """
     if isinstance(value, datetime):
-        # Ensure timezone-aware
-        if value.tzinfo is None:
-            return value.replace(tzinfo=UTC)
-        return value
+        from hindsight_api.timezone import to_utc
+
+        return to_utc(value)
     elif isinstance(value, str):
         # Parse ISO format string (handles both 'Z' and '+00:00' timezone formats)
         dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        # Ensure timezone-aware
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=UTC)
-        return dt
+        from hindsight_api.timezone import to_utc
+
+        return to_utc(dt)
     else:
         raise TypeError(f"Expected datetime or string, got {type(value).__name__}")
 
