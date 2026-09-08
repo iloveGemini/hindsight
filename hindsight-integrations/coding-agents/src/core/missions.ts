@@ -27,8 +27,9 @@ export const GITLOG_MISSION =
   "this work.";
 
 export const CONVERSATION_MISSION =
-  "You are ingesting a developer conversation as a JSONL transcript (one {role, content} turn per line): the " +
-  "user's requests, the assistant's narration, and compact 'action' turns naming each tool use and " +
+  "You are ingesting a developer conversation as canonical JSONL (one " +
+  "hindsight.canonical_message record per line). Read each record's actor.role and text content: the " +
+  "user's requests, the assistant's narration, and compact 'action' messages naming each tool use and " +
   'its target (e.g. "Edit boltons/strutils.py") with no arguments or outputs. It may be a SHORT ' +
   "decision chat or a LONG working session — scale the facts to the substance, never to the message " +
   "count. Extract the FEWEST facts that capture the OUTCOME: the settled DECISIONS and their exact " +
@@ -78,7 +79,7 @@ export const RETAIN_STRATEGIES = {
     retain_chunk_size: 12000,
   },
   // ONE strategy for ALL developer conversations — backfilled decision chats and live working
-  // sessions alike (they are the same content type in the same JSON transcript format; the mission
+  // sessions alike (they are the same content type in the same canonical JSONL format; the mission
   // scales extraction to the substance, final-state-wins). Chunk big enough to hold a whole typical
   // conversation in ONE chunk so the extractor sees the full proposal→revision arc (the 3000
   // default SPLIT them into per-chunk fragments); very long sessions still split and fall back to

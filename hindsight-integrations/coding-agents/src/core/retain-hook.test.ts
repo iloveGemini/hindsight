@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveBankId } from "./bank";
 import { type RawConfig, resolveConfig } from "./config";
+import type { CanonicalMessage } from "./canonical-message";
 import type { HindsightClient } from "./hindsight";
 import { buildRetain, runRetainHook } from "./retain-hook";
 import { memoryCursorStore, type RetainCursorStore } from "./retain-cursor";
@@ -45,11 +46,11 @@ describe("buildRetain", () => {
   /** Turns retained by one buildRetain call, in order. */
   async function retainedTurns(
     args: Parameters<typeof buildRetain>[0] & { retainSpy: ReturnType<typeof vi.fn> }
-  ): Promise<Array<{ role: string; content: string }>> {
+  ): Promise<CanonicalMessage[]> {
     const { retainSpy, ...rest } = args;
     await buildRetain({ ...rest, client: { retain: retainSpy } as unknown as HindsightClient });
     const [content] = retainSpy.mock.calls[0];
-    return (content as string).split("\n").map((line) => JSON.parse(line));
+    return (content as string).split("\n").map((line) => JSON.parse(line) as CanonicalMessage);
   }
 
   it("recovers Dcode's final assistant message when the materialized transcript lags", async () => {
@@ -63,7 +64,10 @@ describe("buildRetain", () => {
       readTranscript: () => [{ role: "user", content: "make the change" }],
       lastAssistantMessage: "done <hindsight_memories>injected</hindsight_memories>",
     });
-    expect(parsed.at(-1)).toMatchObject({ role: "assistant", content: "done" });
+    expect(parsed.at(-1)).toMatchObject({
+      actor: { role: "assistant" },
+      content: [{ type: "text", text: "done" }],
+    });
   });
 
   it("does not duplicate the final reply when Dcode's transcript already flushed it", async () => {
@@ -82,7 +86,7 @@ describe("buildRetain", () => {
       ],
       lastAssistantMessage: "done",
     });
-    expect(parsed.filter((t) => t.role === "assistant")).toHaveLength(1);
+    expect(parsed.filter((t) => t.actor?.role === "assistant")).toHaveLength(1);
   });
 
   it("dedupes a flushed reply the harness serialized as content blocks", async () => {
@@ -102,7 +106,7 @@ describe("buildRetain", () => {
       lastAssistantMessage: "[{'type': 'text', 'text': 'done'}]",
       readLastMessage: dcodeAssistantText,
     });
-    expect(parsed.filter((t) => t.role === "assistant")).toHaveLength(1);
+    expect(parsed.filter((t) => t.actor?.role === "assistant")).toHaveLength(1);
   });
 
   it("retains the recovered reply as text, not as a serialized block list", async () => {
@@ -119,7 +123,10 @@ describe("buildRetain", () => {
         "{'type': 'text', 'text': 'done'}]",
       readLastMessage: dcodeAssistantText,
     });
-    expect(parsed.at(-1)).toMatchObject({ role: "assistant", content: "done" });
+    expect(parsed.at(-1)).toMatchObject({
+      actor: { role: "assistant" },
+      content: [{ type: "text", text: "done" }],
+    });
   });
 
   it("retains parsed turns", async () => {
@@ -153,14 +160,20 @@ describe("buildRetain", () => {
     expect(retainSpy).toHaveBeenCalledTimes(1);
     const [content, , documentId, tags, strategy] = retainSpy.mock.calls[0];
     expect(documentId).toBe("conversation:sess-1");
-    // A JSONL transcript (renderSessionJsonl): one {role, content, timestamp} object per line,
-    // led by the REF-ID system turn.
-    const parsed = (content as string)
-      .split("\n")
-      .map((line) => JSON.parse(line) as { role: string; content: string });
-    expect(parsed[0]).toMatchObject({ role: "system", content: "REF-ID: conversation:sess-1" });
-    expect(parsed[1]).toMatchObject({ role: "user", content: "we use zod for validation" });
-    expect(parsed[2]).toMatchObject({ role: "assistant", content: "noted, zod it is" });
+    // A canonical JSONL transcript, led by the REF-ID system message.
+    const parsed = (content as string).split("\n").map((line) => JSON.parse(line));
+    expect(parsed[0]).toMatchObject({
+      actor: { role: "system" },
+      content: [{ text: "REF-ID: conversation:sess-1" }],
+    });
+    expect(parsed[1]).toMatchObject({
+      actor: { role: "user" },
+      content: [{ text: "we use zod for validation" }],
+    });
+    expect(parsed[2]).toMatchObject({
+      actor: { role: "assistant" },
+      content: [{ text: "noted, zod it is" }],
+    });
     // Verbose `session` extraction, not the ≤2-fact `chat` extractor.
     expect(strategy).toBe("conversation");
     expect(tags).toEqual(["source:chat", "harness:claude-code"]);
@@ -285,7 +298,10 @@ describe("buildRetain — incremental write-back across Stop hooks", () => {
     expect(retain.mock.calls[0][5].updateMode).toBeUndefined();
     const appended = (retain.mock.calls[1][0] as string).split("\n");
     expect(appended).toHaveLength(1);
-    expect(JSON.parse(appended[0])).toMatchObject({ role: "user", content: "turn 2" });
+    expect(JSON.parse(appended[0])).toMatchObject({
+      actor: { role: "user" },
+      content: [{ text: "turn 2" }],
+    });
     expect(retain.mock.calls[1][5].updateMode).toBe("append");
   });
 
@@ -321,7 +337,9 @@ describe("buildRetain — incremental write-back across Stop hooks", () => {
     expect(retain.mock.calls[1][5].updateMode).toBeUndefined();
     const rewritten = (retain.mock.calls[1][0] as string).split("\n");
     expect(rewritten).toHaveLength(3); // REF-ID + the two turns that now exist
-    expect(JSON.parse(rewritten[1])).toMatchObject({ content: "summary of the work so far" });
+    expect(JSON.parse(rewritten[1])).toMatchObject({
+      content: [{ text: "summary of the work so far" }],
+    });
   });
 
   it("a failed write is not silently skipped by the next one — it replaces", async () => {

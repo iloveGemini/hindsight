@@ -78,7 +78,7 @@ const GIT_INGEST =
 if (!REPO || !BANK) {
   console.error(
     "usage: node deepen.js --repo <path> [--bank <id>] [--harness <name>] " +
-      "[--conversations f.json] [--api-url U] [--api-token X] [--config path] [--gitlog-limit N] [--git-ingest message|full|none]\n" +
+      "[--conversations f.jsonl] [--api-url U] [--api-token X] [--config path] [--gitlog-limit N] [--git-ingest message|full|none]\n" +
       `harnesses: ${HARNESS_NAMES.join(", ")}`
   );
   process.exit(1);

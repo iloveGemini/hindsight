@@ -1,8 +1,30 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { getHarness, HARNESS_NAMES, PLUGIN_ENTRYPOINTS } from "./registry";
+import { getHarness, HARNESS_NAMES, jsonChatReader, PLUGIN_ENTRYPOINTS } from "./registry";
+
+describe("jsonChatReader", () => {
+  it("reads one session per JSONL line and skips blank or malformed lines", async () => {
+    const root = mkdtempSync(join(tmpdir(), "hs-chat-reader-"));
+    const file = join(root, "conversations.jsonl");
+    const first = { id: "s1", turns: [{ role: "user", text: "hello" }] };
+    const second = { id: "s2", turns: [{ role: "assistant", text: "world" }] };
+    writeFileSync(
+      file,
+      `\n${JSON.stringify(first)}\r\n${JSON.stringify([first])}\nnot-json\n42\n${JSON.stringify(second)}\n`
+    );
+
+    try {
+      const reader = jsonChatReader("test");
+      expect(reader.describe).toContain("JSONL");
+      await expect(reader.read({ conversations: file })).resolves.toEqual([first, second]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("HARNESS_NAMES", () => {
   it("lists all registered harnesses", () => {

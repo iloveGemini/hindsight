@@ -51,7 +51,9 @@ export interface RetainCursor {
  * materializes a second copy of the transcript.
  */
 export function fingerprintTurns(turns: TransportTurn[], count: number): string {
-  const h = createHash("sha1").update(String(count));
+  // Changing the transcript wire format must invalidate persisted cursors so the first write
+  // after an upgrade replaces an old document instead of appending incompatible JSONL records.
+  const h = createHash("sha1").update(`canonical-message/v1\n${count}`);
   for (let i = 0; i < count; i++) h.update("\n" + JSON.stringify(turns[i]));
   return h.digest("hex");
 }

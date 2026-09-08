@@ -22,6 +22,7 @@ from ..operation_metadata import RetainExtractionErrors
 from ..response_models import TokenUsage
 from ..structured_output import provider_json_schema, strict_json_schema
 from . import attachment_content
+from .canonical_message import metadata_for_chunk
 
 if TYPE_CHECKING:
     from .attachment_store import RetainAttachmentLoader
@@ -3133,7 +3134,7 @@ async def extract_facts_from_contents_batch_api(
                 attachment_ids=_attachment_ids_for(fact_from_llm, chunk_meta.chunk_text),
                 context=content.context,
                 mentioned_at=content.event_date,
-                metadata=content.metadata,
+                metadata=metadata_for_chunk(content.metadata, chunk_meta.chunk_text),
                 tags=content.tags,
                 observation_scopes=content.observation_scopes,
             )
@@ -3203,7 +3204,7 @@ def _extract_facts_chunks(
                     attachment_ids=list(dict.fromkeys(attachment_content.iter_placeholder_ids(chunk))),
                     context=content.context,
                     mentioned_at=content.event_date,
-                    metadata=content.metadata,
+                    metadata=metadata_for_chunk(content.metadata, chunk),
                     tags=content.tags,
                     observation_scopes=content.observation_scopes,
                 )
@@ -3346,7 +3347,7 @@ async def extract_facts_from_contents(
                     context=content.context,
                     # mentioned_at: always the event_date (when the conversation/document occurred)
                     mentioned_at=content.event_date,
-                    metadata=content.metadata,
+                    metadata=metadata_for_chunk(content.metadata, chunk_text),
                     tags=content.tags,
                     observation_scopes=content.observation_scopes,
                 )

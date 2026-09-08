@@ -15,7 +15,7 @@ export interface ChatSession {
 
 /** Reads a harness's past sessions into normalized ChatSessions for the backfill. */
 export interface ChatReader {
-  /** Locate + parse this harness's sessions. `conversations` is an optional pre-exported JSON file. */
+  /** Locate + parse this harness's sessions. `conversations` is an optional pre-exported JSONL file. */
   read(opts: { conversations?: string; repo?: string }): Promise<ChatSession[]>;
   /** One-line help shown in the CLI for this harness's chat source. */
   readonly describe: string;

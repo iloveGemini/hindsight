@@ -7,6 +7,7 @@ Handles insertion of facts into the database.
 import json
 import logging
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
@@ -14,6 +15,7 @@ from ...config import _get_raw_config
 from ..memory_engine import fq_table
 from ..metadata_utils import drop_null_values
 from .bank_utils import create_bank_row_on_conn
+from .canonical_message import SOURCE_MESSAGE_IDS_METADATA, SOURCE_MESSAGE_SCHEMA_METADATA
 from .fact_extraction import _sanitize_text
 from .types import ProcessedFact
 
@@ -23,6 +25,23 @@ logger = logging.getLogger(__name__)
 #: that one page covers any ordinary document, small enough that a pathological
 #: one does not arrive as a single result set.
 _OUTGOING_PAGE = 500
+
+
+def _metadata_for_survivor(
+    existing: Mapping[str, Any] | str | None, metadata: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """Replace document metadata without dropping canonical evidence pointers."""
+    result = drop_null_values(metadata)
+    if isinstance(existing, str):
+        try:
+            existing = json.loads(existing)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            existing = None
+    if existing:
+        for key in (SOURCE_MESSAGE_IDS_METADATA, SOURCE_MESSAGE_SCHEMA_METADATA):
+            if key in existing:
+                result[key] = existing[key]
+    return result
 
 
 async def get_document_content(
@@ -608,7 +627,7 @@ async def update_memory_units_metadata_and_tags(
                 unit_id=m.unit_id,
                 tags=new_tags_by_unit[m.unit_id],
                 metadata={
-                    META_METADATA_JSON: json.dumps(drop_null_values(metadata or {})),
+                    META_METADATA_JSON: json.dumps(_metadata_for_survivor(m.metadata, metadata)),
                     META_OBSERVATION_SCOPES: json.dumps(observation_scopes),
                 },
             )
@@ -640,7 +659,7 @@ async def update_memory_units_metadata_and_tags(
     # know which units actually moved, and after the UPDATE that is no longer answerable.
     prior = await conn.fetch(
         f"""
-        SELECT id, fact_type, tags, observation_scopes
+        SELECT id, fact_type, tags, observation_scopes, metadata
         FROM {fq_table("memory_units")}
         WHERE bank_id = $1 AND document_id = $2
         """,
@@ -671,6 +690,29 @@ async def update_memory_units_metadata_and_tags(
         json.dumps(drop_null_values(metadata)),
         json.dumps(observation_scopes) if observation_scopes is not None else None,
     )
+
+    evidence_updates = []
+    for row in prior:
+        existing = row.get("metadata")
+        if isinstance(existing, str):
+            try:
+                existing = json.loads(existing)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                existing = None
+        if not isinstance(existing, Mapping) or not any(
+            key in existing for key in (SOURCE_MESSAGE_IDS_METADATA, SOURCE_MESSAGE_SCHEMA_METADATA)
+        ):
+            continue
+        evidence_updates.append((json.dumps(_metadata_for_survivor(existing, metadata)), row["id"]))
+    if evidence_updates:
+        await conn.executemany(
+            f"""
+            UPDATE {fq_table("memory_units")}
+            SET metadata = $3, updated_at = NOW()
+            WHERE bank_id = $1 AND document_id = $2 AND id = $4
+            """,
+            [(bank_id, document_id, metadata_json, unit_id) for metadata_json, unit_id in evidence_updates],
+        )
 
     # Restore each survivor's label projection over the blanket write above. Done as a
     # follow-up rather than folded into that statement so a row inserted concurrently

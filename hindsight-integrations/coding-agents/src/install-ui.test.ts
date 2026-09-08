@@ -164,7 +164,7 @@ describe("installer UI renderer", () => {
     const { ui, lines } = makeUi("install");
     ui.intro();
     ui.log("claude-code: conversation import did not finish — re-run it any time with:");
-    ui.log('  node "/opt/dist/deepen.js" --repo "/home/u/w" --conversations "/tmp/c.json"');
+    ui.log('  node "/opt/dist/deepen.js" --repo "/home/u/w" --conversations "/tmp/c.jsonl"');
     const detail = lines.at(-1)!;
     expect(detail).toContain('node "/opt/dist/deepen.js"');
     expect(detail).not.toContain("✓");

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import type { TransportTurn } from "./chat";
 import { fingerprintTurns, memoryCursorStore, planRetain } from "./retain-cursor";
 
@@ -63,6 +64,15 @@ describe("planRetain", () => {
     expect(planRetain(all, cursorFor(all, 3), { ...SUPPORTED, bank: "other-repo" })).toEqual({
       mode: "replace",
     });
+  });
+
+  it("replaces a cursor from the pre-canonical transcript format", () => {
+    const all = turns(5);
+    const legacy = createHash("sha1").update("3");
+    for (let i = 0; i < 3; i++) legacy.update("\n" + JSON.stringify(all[i]));
+    expect(
+      planRetain(all, { turns: 3, fingerprint: legacy.digest("hex"), bank: BANK }, SUPPORTED)
+    ).toEqual({ mode: "replace" });
   });
 
   it("skips when nothing was added since the last write", () => {

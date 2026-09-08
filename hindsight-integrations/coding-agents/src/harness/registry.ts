@@ -5,7 +5,7 @@
  * getHarness() never statically OR dynamically imports opencode.ts, even for "opencode": backfill
  * (its only real caller — see core/config.ts's note that the top-level `harness` key just selects
  * the backfill session formatter) only ever needs a harness's chatReader, and every harness's
- * chatReader — opencode included — is the same normalized-JSON reader (jsonChatReader below).
+ * chatReader — opencode included — is the same normalized-JSONL reader (jsonChatReader below).
  * opencode.ts's plugin-specific createRuntime (the only part that needs @opencode-ai/plugin) is
  * wired up directly by src/index.ts, the opencode plugin entrypoint, bypassing this registry
  * entirely. That keeps this file, and everything bundled from it (in particular backfill.js), free
@@ -14,14 +14,27 @@
 import { readFileSync } from "node:fs";
 import type { ChatSession, HarnessAdapter } from "../core/types";
 
-/** Every harness ingests past sessions through the same normalized JSON interchange format. */
+/** Every harness ingests past sessions through the same normalized JSONL interchange format. */
 export const jsonChatReader = (harness: string) => ({
   describe:
-    `${harness} sessions via a normalized JSON export ` +
-    "(--conversations file: [{ id, turns:[{role,text,timestamp?}] }])",
+    `${harness} sessions via a normalized JSONL export ` +
+    "(--conversations file: one { id, turns:[{role,text,timestamp?}] } per line)",
   async read(opts: { conversations?: string }): Promise<ChatSession[]> {
     if (!opts.conversations) return [];
-    return JSON.parse(readFileSync(opts.conversations, "utf8")) as ChatSession[];
+    return readFileSync(opts.conversations, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          const value = JSON.parse(line);
+          return value && typeof value === "object" && !Array.isArray(value)
+            ? [value as ChatSession]
+            : [];
+        } catch {
+          return [];
+        }
+      });
   },
 });
 

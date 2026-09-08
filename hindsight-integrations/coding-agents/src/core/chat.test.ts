@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { RateLimitedError, type HindsightClient } from "./hindsight";
 import { ingestChats, renderSessionJsonl, retainLiveSession, type TransportTurn } from "./chat";
+import { CANONICAL_MESSAGE_SCHEMA_VERSION, CANONICAL_MESSAGE_TYPE } from "./canonical-message";
 import { memoryCursorStore, type RetainCursorStore } from "./retain-cursor";
 
 describe("renderSessionJsonl", () => {
@@ -10,37 +11,37 @@ describe("renderSessionJsonl", () => {
     { role: "action", content: "Edit uploader.ts" },
   ];
 
-  it("renders JSONL (one JSON object per line) led by the REF-ID system turn, preserving roles/content/timestamps", () => {
+  it("renders canonical JSONL with stable message identity and provenance", () => {
     const jsonl = renderSessionJsonl("conversation:s1", turns, "2026-01-01T00:00:00Z");
-    const parsed = jsonl.split("\n").map((line) => JSON.parse(line) as TransportTurn);
+    const parsed = jsonl.split("\n").map((line) => JSON.parse(line));
     expect(parsed).toHaveLength(4);
-    expect(parsed[0]).toEqual({
-      role: "system",
-      content: "REF-ID: conversation:s1",
-      timestamp: "2026-01-01T00:00:00Z",
-    });
-    expect(parsed[1]).toEqual({
-      role: "user",
-      content: "Add retry backoff",
-      timestamp: "2026-01-01T00:00:00Z",
-    });
-    expect(parsed[2]).toEqual({
-      role: "assistant",
-      content: "On it.",
-      timestamp: "2026-01-01T00:00:01Z",
-    });
-    // Compact action turns pass through untouched (no timestamp -> none serialized).
-    expect(parsed[3]).toEqual({ role: "action", content: "Edit uploader.ts" });
+    expect(parsed.map((message) => message.type)).toEqual(Array(4).fill(CANONICAL_MESSAGE_TYPE));
+    expect(parsed.map((message) => message.schema_version)).toEqual(
+      Array(4).fill(CANONICAL_MESSAGE_SCHEMA_VERSION)
+    );
+    expect(parsed.map((message) => message.sequence)).toEqual([0, 1, 2, 3]);
+    expect(parsed[0].actor).toEqual({ role: "system" });
+    expect(parsed[0].content).toEqual([{ type: "text", text: "REF-ID: conversation:s1" }]);
+    expect(parsed[1].actor).toEqual({ role: "user" });
+    expect(parsed[1].occurred_at).toBe("2026-01-01T00:00:00Z");
+    expect(parsed[2].content).toEqual([{ type: "text", text: "On it." }]);
+    expect(parsed[3].actor).toEqual({ role: "action" });
+    expect(parsed[3].occurred_at).toBeNull();
+    expect(parsed.every((message) => message.conversation_id === "conversation:s1")).toBe(true);
+    expect(parsed.every((message) => message.source.external_id === "conversation:s1")).toBe(true);
+    expect(
+      parsed.every((message) => /^[0-9a-f]{64}$/.test(message.integrity.canonical_sha256))
+    ).toBe(true);
+    expect(new Set(parsed.map((message) => message.message_id)).size).toBe(4);
   });
 
   it("empty turn list still yields the REF-ID system turn alone (exactly one line)", () => {
     const lines = renderSessionJsonl("r", [], "2026-01-01T00:00:00Z").split("\n");
     expect(lines).toHaveLength(1);
-    expect(JSON.parse(lines[0]) as TransportTurn).toEqual({
-      role: "system",
-      content: "REF-ID: r",
-      timestamp: "2026-01-01T00:00:00Z",
-    });
+    const message = JSON.parse(lines[0]);
+    expect(message.actor).toEqual({ role: "system" });
+    expect(message.content).toEqual([{ type: "text", text: "REF-ID: r" }]);
+    expect(message.sequence).toBe(0);
   });
 });
 
@@ -58,13 +59,10 @@ describe("retainLiveSession", () => {
     const [content, context, documentId, tags, strategy, opts] = retain.mock.calls[0];
     // The retained content IS the renderSessionJsonl transcript.
     expect(content).toBe(renderSessionJsonl("conversation:s2", turns, "2026-01-01T00:00:00Z"));
-    const parsed = (content as string).split("\n").map((line) => JSON.parse(line) as TransportTurn);
-    expect(parsed[0]).toEqual({
-      role: "system",
-      content: "REF-ID: conversation:s2",
-      timestamp: "2026-01-01T00:00:00Z",
-    });
-    expect(parsed[1]).toEqual({ role: "user", content: "hi", timestamp: "2026-01-01T00:00:00Z" });
+    const parsed = (content as string).split("\n").map((line) => JSON.parse(line));
+    expect(parsed[0].content).toEqual([{ type: "text", text: "REF-ID: conversation:s2" }]);
+    expect(parsed[1].content).toEqual([{ type: "text", text: "hi" }]);
+    expect(parsed[1].sequence).toBe(1);
     expect(context).toBe("coding agent session");
     expect(documentId).toBe("conversation:s2");
     expect(tags).toEqual(["source:chat"]);
@@ -95,7 +93,13 @@ describe("ingestChats", () => {
     );
 
     expect(retain).toHaveBeenCalledTimes(1);
-    const [, , , tags, , opts] = retain.mock.calls[0];
+    const [content, , , tags, , opts] = retain.mock.calls[0];
+    const messages = (content as string).split("\n").map((line) => JSON.parse(line));
+    expect(messages.every((message) => message.type === CANONICAL_MESSAGE_TYPE)).toBe(true);
+    expect(messages.map((message) => message.content[0].text)).toEqual([
+      "REF-ID: chat:s-import",
+      "remember this",
+    ]);
     expect(tags).toEqual(["project:repo-a", "session:s-import", "source:chat"]);
     expect(opts.metadata).toMatchObject({
       project: "repo-a",
@@ -139,12 +143,15 @@ describe("retainLiveSession — incremental write-back", () => {
     await write(client, turns(5), cursors);
     const second = retain.mock.calls[1];
     expect(second[5].updateMode).toBe("append");
-    // Only the three new turns, and no REF-ID header: the document already carries one.
-    expect((second[0] as string).split("\n").map((l) => JSON.parse(l) as TransportTurn)).toEqual([
-      turn(2),
-      turn(3),
-      turn(4),
+    // Only the three new canonical messages, and no REF-ID header: the document already carries one.
+    const appended = (second[0] as string).split("\n").map((l) => JSON.parse(l));
+    expect(appended.map((message) => message.sequence)).toEqual([3, 4, 5]);
+    expect(appended.map((message) => message.content[0].text)).toEqual([
+      "turn 2",
+      "turn 3",
+      "turn 4",
     ]);
+    expect(appended.every((message) => message.type === CANONICAL_MESSAGE_TYPE)).toBe(true);
     expect(second[2]).toBe("conversation:s1"); // same document id — append targets it
   });
 

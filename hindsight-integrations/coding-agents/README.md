@@ -728,9 +728,9 @@ run), then knowledge pages once extraction has drained. Harnesses that need dete
 (benchmarks, e2e suites) run the same engine directly and poll `dist/status.js` until
 `"synced": true` — the exact readiness contract the `hindsight_sync_status` agent tool reports.
 
-Past-conversation import accepts a normalized interchange file (engine `--conversations` flag):
-`[{ "id": "s1", "turns": [{ "role": "user", "text": "...", "timestamp?": "ISO" }, ...] }, ...]`,
-chronological (a later chat can amend an earlier one). Day-to-day, conversations simply accrue from
+Past-conversation import accepts a normalized JSONL interchange file (engine `--conversations` flag),
+with one session per line: `{ "id": "s1", "turns": [{ "role": "user", "text": "...", "timestamp?": "ISO" }, ...] }`.
+Lines are chronological (a later chat can amend an earlier one). Day-to-day, conversations simply accrue from
 the live session write-back — no export step.
 
 Local Hindsight for trying it out:

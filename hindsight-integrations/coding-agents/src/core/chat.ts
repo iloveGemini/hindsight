@@ -1,14 +1,11 @@
-/**
- * Harness-agnostic chat memory: the JSON user/assistant transcript schema shared by BOTH the
- * backfill (ingest past sessions) and the live runtime write-back. A leading `system` turn carries
- * the REF-ID tracer; every turn gets an ABSOLUTE timestamp.
- */
+/** Harness-agnostic chat memory: canonical JSONL shared by backfill and live write-back. */
 import { RateLimitedError, type HindsightClient } from "./hindsight";
 import { fingerprintTurns, planRetain, type RetainCursorStore } from "./retain-cursor";
 import type { RetainStamp } from "./retain-stamp";
 import type { ChatSession } from "./types";
 import { uuidV5 } from "./uuid";
 import { pool, sleep } from "./util";
+import { renderCanonicalJsonl, toCanonicalMessage } from "./canonical-message";
 
 export interface TransportTurn {
   role: string;
@@ -22,19 +19,23 @@ export function withRefId(refId: string, turns: TransportTurn[], baseTs: string)
 }
 
 /**
- * Render normalized turns as a JSONL transcript (ONE turn per line) — the same shape everywhere:
+ * Render normalized turns as canonical JSONL (ONE message per line) — the same shape everywhere:
  * live write-back and backfilled chats alike. JSONL beats a JSON array on both ends: appending a
  * turn never rewrites the document, and the server's structured chunker treats each line as an
  * atomic unit (`retain_structured_chunk_size`), so a turn is never split mid-thought. The REF-ID
  * system turn leads; tool activity is already compacted into `role:"action"` turns.
  */
 export function renderSessionJsonl(refId: string, turns: TransportTurn[], baseTs: string): string {
-  return withRefId(refId, turns, baseTs)
-    .map((t) => JSON.stringify(t))
-    .join("\n");
+  const system = toCanonicalMessage(
+    refId,
+    { role: "system", content: `REF-ID: ${refId}`, timestamp: baseTs },
+    0
+  );
+  const body = renderCanonicalJsonl(refId, turns, 1);
+  return [JSON.stringify(system), body].filter(Boolean).join("\n");
 }
 
-/** Backfill: ingest past sessions RAW as JSON transcripts under the `conversation` strategy. */
+/** Backfill: ingest past sessions as canonical JSONL under the `conversation` strategy. */
 export async function ingestChats(
   client: HindsightClient,
   sessions: ChatSession[],
@@ -49,7 +50,7 @@ export async function ingestChats(
     log("[chat] no sessions; skipping");
     return 0;
   }
-  log(`[chat] ingesting ${sessions.length} chats (RAW, JSONL transcript — one turn per line) …`);
+  log(`[chat] ingesting ${sessions.length} chats (canonical JSONL — one message per line) …`);
   const NOW = Date.now(); // anchor synthesized times to a real, ABSOLUTE clock (not a fabricated epoch)
   let failures = 0;
   await pool(
@@ -64,17 +65,13 @@ export async function ingestChats(
       // inverted recency and made an amendment rank older than the decision it superseded.
       const sessBase = NOW - (sessions.length - 1 - i) * 3600000;
       const baseIso = new Date(sessBase).toISOString();
-      const turns = withRefId(
-        `chat:${id}`,
-        (s.turns || []).map((t, j) => ({
-          role: t.role,
-          content: t.text,
-          timestamp: t.timestamp || new Date(sessBase + (j + 1) * 60000).toISOString(),
-        })),
-        baseIso
-      );
+      const turns = (s.turns || []).map((t, j) => ({
+        role: t.role,
+        content: t.text,
+        timestamp: t.timestamp || new Date(sessBase + (j + 1) * 60000).toISOString(),
+      }));
       await client.retain(
-        turns.map((x) => JSON.stringify(x)).join("\n"),
+        renderSessionJsonl(`chat:${id}`, turns, baseIso),
         "developer chat",
         `chat:${id}`,
         [...new Set([...(stamp?.tags ?? []), "source:chat"])],
@@ -95,7 +92,7 @@ export async function ingestChats(
       log(`  ! chat ${i} failed to enqueue: ${(e as Error).message?.slice(0, 120)}`);
     }
   );
-  log(`[chat] done: ${sessions.length} chats ingested (JSONL) under strategy 'chat'`);
+  log(`[chat] done: ${sessions.length} chats ingested (canonical JSONL) under strategy 'chat'`);
   return failures;
 }
 
@@ -197,7 +194,7 @@ function serialize(
  * uncertain case resolves that way.
  *
  * Uses the same `conversation` strategy as backfilled chats — one strategy for all developer
- * conversations; the mission scales extraction to the substance. The content is a JSON transcript
+ * conversations; the mission scales extraction to the substance. The content is canonical JSONL
  * (renderSessionJsonl) whose tool activity is compacted into `role:"action"` turns
  * (see core/transcript*.ts).
  */
@@ -245,10 +242,7 @@ async function writeSession(
 
   const content =
     plan.mode === "append"
-      ? turns
-          .slice(plan.fromTurn)
-          .map((t) => JSON.stringify(t))
-          .join("\n")
+      ? renderCanonicalJsonl(refId, turns.slice(plan.fromTurn), plan.fromTurn + 1)
       : renderSessionJsonl(refId, turns, startTs);
 
   // Claim the new position BEFORE the write and mark it unconfirmed, so a client that times out on
