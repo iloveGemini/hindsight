@@ -2365,6 +2365,9 @@ class DocumentListItem(OpenRowModel):
     created_at: str = Field(default="", description="When the document was first retained (ISO 8601)")
     updated_at: str = Field(default="", description="When the document was last written (ISO 8601)")
     text_length: int = Field(default=0, description="Length of the stored document text in characters")
+    message_count: int | None = Field(
+        default=None, description="Number of canonical messages in the document if it is a conversation"
+    )
     memory_unit_count: int = Field(default=0, description="Number of memory units extracted from this document")
     retain_params: dict[str, Any] | None = Field(default=None, description="Parameters used during retain")
     document_metadata: dict[str, Any] | None = Field(default=None, description="Document metadata")

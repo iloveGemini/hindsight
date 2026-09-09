@@ -15,7 +15,7 @@ from ...config import _get_raw_config
 from ..memory_engine import fq_table
 from ..metadata_utils import drop_null_values
 from .bank_utils import create_bank_row_on_conn
-from .canonical_message import SOURCE_MESSAGE_IDS_METADATA, SOURCE_MESSAGE_SCHEMA_METADATA
+from .canonical_message import SOURCE_MESSAGE_IDS_METADATA, SOURCE_MESSAGE_SCHEMA_METADATA, canonical_message_ids
 from .fact_extraction import _sanitize_text
 from .types import ProcessedFact
 
@@ -407,6 +407,13 @@ async def _upsert_document_row(
 
     if get_memories().store_owned_for(bank_id):
         original_text = None
+
+    if combined_content and "hindsight.canonical_message" in combined_content:
+        canonical_ids = canonical_message_ids(combined_content)
+        if canonical_ids:
+            retain_params = dict(retain_params or {})
+            retain_params["message_count"] = len(canonical_ids)
+
     await conn.execute(
         f"""
         INSERT INTO {fq_table("documents")} (id, bank_id, original_text, content_hash, retain_params, tags, created_at, updated_at)

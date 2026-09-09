@@ -12110,6 +12110,7 @@ class MemoryEngine(MemoryEngineInterface):
 
                 # document_metadata is sourced from retain_params.metadata
                 document_metadata = retain_params_val.get("metadata") if retain_params_val else None
+                message_count = retain_params_val.get("message_count") if retain_params_val else None
 
                 items.append(
                     {
@@ -12119,6 +12120,7 @@ class MemoryEngine(MemoryEngineInterface):
                         "created_at": row["created_at"].isoformat() if row["created_at"] else "",
                         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else "",
                         "text_length": row["text_length"] or 0,
+                        "message_count": message_count,
                         "memory_unit_count": unit_count,
                         "retain_params": retain_params_val or None,
                         "document_metadata": document_metadata or None,

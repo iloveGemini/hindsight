@@ -1118,6 +1118,7 @@ export class ControlPlaneClient {
         invalidation_reason: string | null;
         invalidated_at: string | null;
         edited_at: string | null;
+        metadata?: Record<string, unknown>;
       }>;
       total: number;
       limit: number;

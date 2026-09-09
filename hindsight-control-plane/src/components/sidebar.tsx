@@ -9,7 +9,7 @@ import {
   Search,
   Sparkles,
   Database,
-  FileText,
+  MessagesSquare,
   Users,
   Network,
   ChevronLeft,
@@ -59,7 +59,7 @@ export function Sidebar({ currentTab, onTabChange }: SidebarProps) {
     { id: "knowledge" as NavItem, label: t("knowledge"), icon: Network },
     { id: "recall" as NavItem, label: t("recall"), icon: Search },
     { id: "reflect" as NavItem, label: t("reflect"), icon: Sparkles },
-    { id: "documents" as NavItem, label: t("documents"), icon: FileText },
+    { id: "documents" as NavItem, label: t("documents"), icon: MessagesSquare },
     { id: "entities" as NavItem, label: t("entities"), icon: Users },
     { id: "profile" as NavItem, label: tBank("bankConfiguration"), icon: Settings },
   ];

@@ -76,6 +76,10 @@ import {
   Lock,
   RotateCcw,
   Search,
+  MessagesSquare,
+  MessageSquare,
+  MessageSquareText,
+  Lightbulb,
 } from "lucide-react";
 import { TagFilterInput } from "./tag-filter-input";
 import { FacetLegend, MetadataChip, TagChip } from "@/components/ui/facet-chip";
@@ -83,6 +87,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { HarnessLogo } from "@/components/ui/harness-logo";
 import { InlineAttachmentText } from "@/components/ui/inline-attachment-text";
 import { documentHarness, resolveHarnessLogo } from "@/lib/harness-logo";
+import { CanonicalMessageViewer } from "./canonical-message-viewer";
+import { MemoryDetailModal } from "./memory-detail-modal";
+import { parseCanonicalMessages, buildEvidenceMapping } from "@/lib/canonical-message";
+import { cn } from "@/lib/utils";
 
 const ITEMS_PER_PAGE = 50;
 
@@ -198,7 +206,127 @@ function MetadataBadges({ metadata }: { metadata: Record<string, any> }) {
 // the document dialog — this column is for scanning, not reading.
 const ROW_CHIP_LIMIT = 3;
 
-// Bounds a single chip so one long metadata value can't claim the whole row.
+function extractDocumentDisplayTitle(doc: any): { title: string; isCustomTitle: boolean } {
+  const meta = doc?.document_metadata || doc?.retain_params?.metadata || {};
+  if (typeof meta.title === "string" && meta.title.trim()) {
+    return { title: meta.title.trim(), isCustomTitle: true };
+  }
+  if (typeof meta.topic === "string" && meta.topic.trim()) {
+    return { title: meta.topic.trim(), isCustomTitle: true };
+  }
+  if (typeof meta.name === "string" && meta.name.trim()) {
+    return { title: meta.name.trim(), isCustomTitle: true };
+  }
+  if (typeof meta.chat_id === "string" && meta.chat_id.trim()) {
+    return { title: meta.chat_id.trim(), isCustomTitle: false };
+  }
+  const id = doc?.id || "";
+  const chatMatch = id.match(/chat:[^:]+$/);
+  if (chatMatch) {
+    return { title: chatMatch[0].replace(/^chat:/, ""), isCustomTitle: false };
+  }
+  const lastColon = id.lastIndexOf(":");
+  if (lastColon !== -1 && lastColon < id.length - 1) {
+    return { title: id.slice(lastColon + 1), isCustomTitle: false };
+  }
+  return { title: id, isCustomTitle: false };
+}
+
+function extractDocumentSource(
+  doc: any,
+  harness: string | null,
+  harnessLogo: any
+): { label: string; raw: string; badgeClass: string; logo: any } {
+  const meta = doc?.document_metadata || doc?.retain_params?.metadata || {};
+  let source = "";
+  if (typeof meta.source === "string" && meta.source.trim()) {
+    source = meta.source.trim();
+  } else if (harness) {
+    source = harness;
+  } else {
+    for (const tag of doc?.tags || []) {
+      if (typeof tag === "string") {
+        if (tag.startsWith("source:")) {
+          source = tag.replace(/^source:/, "");
+          break;
+        }
+        if (tag.endsWith("-chat") || tag.endsWith("_chat")) {
+          source = tag.replace(/[-_]chat$/, "");
+          break;
+        }
+      }
+    }
+  }
+
+  const sLower = source.toLowerCase();
+  if (sLower === "echore") {
+    return {
+      label: "Echore",
+      raw: source,
+      badgeClass: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      logo: harnessLogo,
+    };
+  }
+  if (sLower === "claude-code" || sLower === "claude_code" || sLower === "claude") {
+    return {
+      label: "Claude Code",
+      raw: source,
+      badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      logo: harnessLogo,
+    };
+  }
+  if (sLower === "opencode" || sLower === "opencode2") {
+    return {
+      label: "OpenCode",
+      raw: source,
+      badgeClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      logo: harnessLogo,
+    };
+  }
+  if (sLower === "cursor" || sLower === "cursor-cli") {
+    return {
+      label: "Cursor",
+      raw: source,
+      badgeClass: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      logo: harnessLogo,
+    };
+  }
+  if (source) {
+    return {
+      label: harnessLogo?.label || source,
+      raw: source,
+      badgeClass: "bg-muted text-muted-foreground border-border",
+      logo: harnessLogo,
+    };
+  }
+  return {
+    label: "Document",
+    raw: "doc",
+    badgeClass: "bg-muted text-muted-foreground border-border",
+    logo: null,
+  };
+}
+
+function getDocumentMessageCount(doc: any): number | null {
+  if (typeof doc?.message_count === "number") return doc.message_count;
+  if (typeof doc?.retain_params?.message_count === "number") return doc.retain_params.message_count;
+  return null;
+}
+
+function formatFullDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
 const ROW_CHIP_WIDTH = "max-w-[180px]";
 
 function TagsAndMetadataCell({
@@ -766,8 +894,19 @@ export function DocumentsView() {
   // Document view panel state
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [loadingDocument, setLoadingDocument] = useState(false);
+  const [documentMemories, setDocumentMemories] = useState<any[]>([]);
+  const [selectedEvidenceMemoryId, setSelectedEvidenceMemoryId] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<string>("general");
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [deletingUploadOperationId, setDeletingUploadOperationId] = useState<string | null>(null);
+
+  const canonicalMessages = useMemo(() => {
+    return parseCanonicalMessages(selectedDocument?.original_text);
+  }, [selectedDocument?.original_text]);
+
+  const evidenceMapping = useMemo(() => {
+    return buildEvidenceMapping(documentMemories);
+  }, [documentMemories]);
 
   // Tag editing state
   const [editingTags, setEditingTags] = useState(false);
@@ -979,9 +1118,22 @@ export function DocumentsView() {
     try {
       const doc: any = await client.getDocument(documentId, currentBank);
       setSelectedDocument(doc);
+      const parsed = parseCanonicalMessages(doc?.original_text);
+      if (parsed && parsed.length > 0) {
+        setDetailTab("conversation");
+      } else {
+        setDetailTab("general");
+      }
+      try {
+        const mems = await client.listMemories(currentBank, { documentId, limit: 100 });
+        setDocumentMemories(mems.items || []);
+      } catch {
+        setDocumentMemories([]);
+      }
     } catch (error) {
       // Error toast is shown automatically by the API client interceptor
       setSelectedDocument(null);
+      setDocumentMemories([]);
     } finally {
       setLoadingDocument(false);
     }
@@ -1566,21 +1718,11 @@ export function DocumentsView() {
               <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[38%]">{t("colDocument")}</TableHead>
-                    <TableHead>
-                      <FacetLegend
-                        items={[
-                          { kind: "tag", label: t("labelTags") },
-                          { kind: "metadata", label: t("labelMetadata") },
-                        ]}
-                      />
-                    </TableHead>
-                    <TableHead className="w-[110px] text-right whitespace-nowrap">
-                      {t("colSize")}
-                    </TableHead>
-                    <TableHead className="w-[130px] text-right whitespace-nowrap">
-                      {t("colMemoryUnits")}
-                    </TableHead>
+                    <TableHead className="w-[36%]">{t("colDocument")}</TableHead>
+                    <TableHead className="w-[14%]">{t("colSource")}</TableHead>
+                    <TableHead className="w-[18%]">{t("colTime")}</TableHead>
+                    <TableHead className="w-[18%]">{t("colScaleAndMemories")}</TableHead>
+                    <TableHead className="w-[14%] text-right">{t("colStatus")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1600,8 +1742,19 @@ export function DocumentsView() {
                         </div>
                       </TableCell>
                       <TableCell className="text-card-foreground">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border bg-muted text-muted-foreground border-border">
+                          Upload
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-card-foreground text-xs text-muted-foreground">
+                        {formatRelativeTime(upload.createdAt)}
+                      </TableCell>
+                      <TableCell className="text-card-foreground text-xs text-muted-foreground">
+                        -
+                      </TableCell>
+                      <TableCell className="text-card-foreground text-right">
                         {upload.status === "failed" ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-end gap-2">
                             <span
                               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
                               title={upload.error || t("pendingUploadFailed")}
@@ -1636,80 +1789,144 @@ export function DocumentsView() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-card-foreground text-right">-</TableCell>
-                      <TableCell className="text-card-foreground text-right">-</TableCell>
                     </TableRow>
                   ))}
                   {documents.length > 0 ? (
                     documents.map((doc) => {
                       const harness = documentHarness(doc.document_metadata, doc.tags);
                       const harnessLogo = resolveHarnessLogo(harness);
+                      const displayTitle = extractDocumentDisplayTitle(doc);
+                      const sourceInfo = extractDocumentSource(doc, harness, harnessLogo);
+                      const messageCount = getDocumentMessageCount(doc);
+                      const isConversation =
+                        doc.id.startsWith("conversation:") ||
+                        doc.id.startsWith("chat:") ||
+                        doc.id.includes(":chat:") ||
+                        (doc.tags &&
+                          doc.tags.some(
+                            (tg: string) => tg.includes("chat") || tg.includes("conversation")
+                          )) ||
+                        messageCount !== null;
+
                       return (
                         <TableRow
                           key={doc.id}
-                          className={`cursor-pointer hover:bg-muted/50 ${selectedDocument?.id === doc.id ? "bg-primary/10" : ""}`}
+                          className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedDocument?.id === doc.id ? "bg-primary/10" : ""}`}
                           onClick={() => viewDocumentText(doc.id)}
                         >
-                          {/* Identity block: the ID reads first, with when it was
-                              last touched underneath. Created-at was dropped —
-                              for almost every document it repeated updated-at. */}
+                          {/* 1. 会话 / 标题 */}
                           <TableCell className="text-card-foreground">
                             <div className="min-w-0">
-                              <div className="font-mono text-sm truncate" title={doc.id}>
-                                {doc.id}
+                              <div className="flex items-center gap-2">
+                                <span
+                                  title={isConversation ? "Conversation" : "Document"}
+                                  className={`p-1.5 rounded-md shrink-0 ${
+                                    isConversation
+                                      ? "bg-primary/10 text-primary"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}
+                                >
+                                  {isConversation ? (
+                                    <MessagesSquare className="w-4 h-4" />
+                                  ) : (
+                                    <FileText className="w-4 h-4" />
+                                  )}
+                                </span>
+                                <span
+                                  className={`text-sm truncate ${
+                                    displayTitle.isCustomTitle
+                                      ? "font-semibold text-foreground"
+                                      : "font-mono font-medium text-foreground"
+                                  }`}
+                                  title={displayTitle.title}
+                                >
+                                  {displayTitle.title}
+                                </span>
                               </div>
-                              {/* The harness logo trails the timestamp rather
-                                  than leading the ID: as a leading mark it only
-                                  exists on some rows, so every ID shifted
-                                  horizontally depending on whether its document
-                                  had one. Here it appends to a line that is
-                                  already ragged, and nothing moves. */}
-                              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                                {doc.updated_at ? (
-                                  <span title={new Date(doc.updated_at).toLocaleString()}>
-                                    {t("colUpdated")} {formatRelativeTime(doc.updated_at)}
-                                  </span>
-                                ) : (
-                                  "N/A"
-                                )}
-                                <HarnessLogo
-                                  harness={harness}
-                                  size={14}
-                                  titlePrefix={tCommon("harness")}
-                                />
-                                {updatingDocIds.has(doc.id) && (
-                                  <span
-                                    className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-                                    title={t("documentUpdating")}
-                                  >
-                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70 animate-pulse" />
-                                    {t("documentUpdating")}
-                                  </span>
-                                )}
+                              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/80 font-mono">
+                                <span className="truncate max-w-[280px]" title={doc.id}>
+                                  {doc.id}
+                                </span>
                               </div>
                             </div>
                           </TableCell>
+
+                          {/* 2. 来源渠道 */}
                           <TableCell className="text-card-foreground">
-                            <TagsAndMetadataCell
-                              tags={doc.tags ?? []}
-                              metadata={doc.document_metadata}
-                              selectedTags={selectedTags}
-                              onToggleTag={toggleTagFilter}
-                              harnessShownAsLogo={!!harnessLogo}
-                            />
+                            <div className="flex items-center gap-1.5">
+                              {sourceInfo.logo ? (
+                                <HarnessLogo
+                                  harness={sourceInfo.raw}
+                                  size={16}
+                                  titlePrefix={tCommon("harness")}
+                                />
+                              ) : null}
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${sourceInfo.badgeClass}`}
+                              >
+                                {sourceInfo.label}
+                              </span>
+                            </div>
                           </TableCell>
-                          <TableCell className="text-card-foreground text-right tabular-nums whitespace-nowrap font-medium">
-                            {formatBytes(doc.text_length || 0)}
+
+                          {/* 3. 对话时间 */}
+                          <TableCell className="text-card-foreground">
+                            <div className="text-xs">
+                              <div className="text-foreground font-medium">
+                                {formatFullDateTime(doc.created_at || doc.updated_at)}
+                              </div>
+                              <div className="text-muted-foreground mt-0.5 text-[11px]">
+                                {t("colUpdated")}{" "}
+                                {doc.updated_at ? formatRelativeTime(doc.updated_at) : "N/A"}
+                              </div>
+                            </div>
                           </TableCell>
-                          <TableCell className="text-right tabular-nums font-semibold text-foreground">
-                            {doc.memory_unit_count}
+
+                          {/* 4. 规模与记忆 */}
+                          <TableCell className="text-card-foreground">
+                            <div className="space-y-0.5 text-xs">
+                              <div className="flex items-center gap-1 font-medium text-foreground">
+                                <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span>
+                                  {messageCount !== null
+                                    ? t("messageCountUnit", { count: messageCount })
+                                    : formatBytes(doc.text_length || 0)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                                <span>
+                                  {t("memoryCountUnit", { count: doc.memory_unit_count })}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* 5. 状态 */}
+                          <TableCell className="text-right">
+                            {updatingDocIds.has(doc.id) ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                {t("statusExtracting")}
+                              </span>
+                            ) : doc.memory_unit_count > 0 ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                {t("statusExtracted")}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
+                                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
+                                {t("statusNoMemories")}
+                              </span>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
                     })
                   ) : pendingRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">
+                      <TableCell colSpan={5} className="text-center">
                         {t("clickLoadDocumentsToView")}
                       </TableCell>
                     </TableRow>
@@ -1806,16 +2023,34 @@ export function DocumentsView() {
               </div>
             </div>
           ) : selectedDocument ? (
-            <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-hidden">
+            <Tabs
+              value={detailTab}
+              onValueChange={setDetailTab}
+              className="flex-1 flex flex-col overflow-hidden"
+            >
               <div className="flex items-center justify-between gap-2">
-                <TabsList className="grid grid-cols-3 w-full max-w-md">
+                <TabsList
+                  className={cn(
+                    "grid w-full",
+                    canonicalMessages ? "grid-cols-4 max-w-xl" : "grid-cols-3 max-w-md"
+                  )}
+                >
+                  {canonicalMessages && (
+                    <TabsTrigger value="conversation" className="flex items-center gap-1.5">
+                      <MessagesSquare className="w-3.5 h-3.5" />
+                      <span>{t("tabConversation")}</span>
+                      <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary font-mono font-medium">
+                        {canonicalMessages.length}
+                      </span>
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="general" className="flex items-center gap-1.5">
                     <Settings className="w-3.5 h-3.5" />
-                    General
+                    {t("tabGeneral")}
                   </TabsTrigger>
                   <TabsTrigger value="memories" className="flex items-center gap-1.5">
                     <Network className="w-3.5 h-3.5" />
-                    Memories
+                    {t("tabMemories")}
                   </TabsTrigger>
                   <TabsTrigger
                     value="chunks"
@@ -1827,7 +2062,8 @@ export function DocumentsView() {
                     }}
                   >
                     <Layers className="w-3.5 h-3.5" />
-                    Chunks{chunksLoaded ? ` (${chunksTotal})` : ""}
+                    {t("tabChunks")}
+                    {chunksLoaded ? ` (${chunksTotal})` : ""}
                   </TabsTrigger>
                 </TabsList>
                 <DropdownMenu>
@@ -1874,6 +2110,20 @@ export function DocumentsView() {
               </div>
 
               <div className="flex-1 overflow-y-auto mt-4">
+                {/* Conversation Messages Tab */}
+                {canonicalMessages && (
+                  <TabsContent value="conversation" className="mt-0 h-full flex flex-col min-h-0">
+                    <CanonicalMessageViewer
+                      messages={canonicalMessages}
+                      evidenceMapping={evidenceMapping}
+                      onSelectMemory={setSelectedEvidenceMemoryId}
+                      bankId={currentBank ?? ""}
+                      documentId={selectedDocument.id}
+                      className="flex-1 min-h-[450px]"
+                    />
+                  </TabsContent>
+                )}
+
                 {/* Memories Tab — constellation/graph + invalidated facts */}
                 <TabsContent value="memories" className="mt-0">
                   <div className="space-y-4">
@@ -2130,16 +2380,34 @@ export function DocumentsView() {
                                 {selectedDocument.original_text?.length?.toLocaleString() ?? 0}{" "}
                                 chars
                               </span>
+                              {canonicalMessages && (
+                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                                  {canonicalMessages.length} {t("canonicalMessages")}
+                                </span>
+                              )}
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={startEditContent}
-                              className="h-6 px-2 gap-1 text-xs"
-                            >
-                              <Pencil className="h-3 w-3" />
-                              {t("editButton")}
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              {canonicalMessages && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setDetailTab("conversation")}
+                                  className="h-6 px-2 gap-1 text-xs text-primary border-primary/30 hover:bg-primary/10"
+                                >
+                                  <MessagesSquare className="w-3 h-3" />
+                                  {t("viewMessages")}
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={startEditContent}
+                                className="h-6 px-2 gap-1 text-xs"
+                              >
+                                <Pencil className="h-3 w-3" />
+                                {t("editButton")}
+                              </Button>
+                            </div>
                           </div>
                           <InlineAttachmentText
                             text={selectedDocument.original_text}
@@ -2196,6 +2464,14 @@ export function DocumentsView() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Memory Detail Modal for Evidence Inspection */}
+      {selectedEvidenceMemoryId && (
+        <MemoryDetailModal
+          memoryId={selectedEvidenceMemoryId}
+          onClose={() => setSelectedEvidenceMemoryId(null)}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog
