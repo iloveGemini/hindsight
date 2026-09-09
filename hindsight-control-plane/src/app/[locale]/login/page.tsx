@@ -22,21 +22,31 @@ function LoginForm() {
   const returnTo = sanitizeReturnTo(searchParams.get("returnTo"));
 
   useEffect(() => {
-    // Focus the input on mount
-    const input = document.getElementById("access-key");
+    // Focus the input on mount, and capture any pre-filled value
+    const input = document.getElementById("access-key") as HTMLInputElement | null;
     input?.focus();
+    if (input?.value) {
+      setKey(input.value);
+    }
   }, []);
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+
+    const formData = new FormData(e.currentTarget);
+    const submittedKey = ((formData.get("key") as string) || key).trim();
+    if (!submittedKey) {
+      return;
+    }
+
     setLoading(true);
 
     try {
       const res = await fetch(withBasePath("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({ key: submittedKey }),
       });
 
       if (res.ok) {
@@ -76,11 +86,13 @@ function LoginForm() {
             <div>
               <Input
                 id="access-key"
+                name="key"
                 type="password"
                 placeholder={t("accessKeyPlaceholder")}
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
-                autoComplete="off"
+                onInput={(e) => setKey(e.currentTarget.value)}
+                autoComplete="current-password"
               />
             </div>
 

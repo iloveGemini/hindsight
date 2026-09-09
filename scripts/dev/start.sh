@@ -54,6 +54,27 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Kill any orphaned Control-Plane or API server lingering on the target ports
+# from a previous start.sh run to prevent port conflicts.
+kill_port() {
+    local port=$1
+    local pids
+    pids=$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+        echo "Port $port in use — stopping orphaned process(es): $pids"
+        for pid in $pids; do
+            kill_tree "$pid"
+        done
+    fi
+}
+
+echo "Cleaning up any orphaned Control-Plane dev servers..."
+kill_port "$CP_PORT"
+kill_port "$API_PORT"
+sleep 1
+kill_port "$CP_PORT"  # port may linger a moment after SIGTERM
+kill_port "$API_PORT"
+
 # Start API
 echo "Starting API server..."
 "$SCRIPT_DIR/start-api.sh" --port "$API_PORT" &
